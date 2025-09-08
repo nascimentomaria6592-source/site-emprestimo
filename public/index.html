@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Controle de Empréstimos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <h1>Sistema de Controle de Empréstimos</h1>
+        <p>Gerencie seus empréstimos de forma simples e eficiente</p>
+    </header>
+    <div class="container">
+        <nav class="navbar">
+            <button class="nav-button active" data-tab="dashboard">📊 Dashboard</button>
+            <button class="nav-button" data-tab="entradas">👌 Entradas</button>
+            <button class="nav-button" data-tab="saidas">💸 Saídas</button>
+            <button class="nav-button" data-tab="relatorios">📈 Relatórios</button>
+            <button id="logout-button" class="nav-button-logout">🚪 Sair</button>
+        </nav>
+        
+        <section id="dashboard-content" class="tab-content active">
+            <div class="filter-bar">
+                <span>Filtrar por:</span>
+                <select class="filter-month">
+                    <option value="">Todos os meses</option>
+                    <option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option><option value="04">Abril</option><option value="05">Maio</option><option value="06">Junho</option><option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+                </select>
+                <select class="filter-year"></select>
+                <button class="apply-filter-button">Aplicar Filtro</button>
+            </div>
+            <div class="dashboard-cards">
+                <div class="card"><h4>TOTAL EMPRESTADO (ATIVO)</h4><p id="total-emprestado-ativo">R$ 0,00</p></div>
+                <div class="card"><h4>SALDO DEVEDOR (ATIVO)</h4><p id="saldo-devedor-ativo">R$ 0,00</p></div>
+                <div class="card card-pago"><h4>TOTAL PAGO (PRINCIPAL)</h4><p id="total-pago-principal">R$ 0,00</p></div>
+                <div class="card card-juros"><h4>TOTAL DE JUROS RECEBIDOS</h4><p id="total-juros-recebidos">R$ 0,00</p></div>
+                <div class="card"><h4>EMPRÉSTIMOS ATIVOS</h4><p id="emprestimos-ativos">0</p></div>
+                <div class="card card-vencer"><h4>PRÓXIMOS A VENCER</h4><p id="proximos-a-vencer">0</p></div>
+                <div class="card card-atrasado"><h4>EMPRÉSTIMOS ATRASADOS</h4><p id="emprestimos-atrasados">0</p></div>
+            </div>
+            </div>
+            <div class="content-box">
+                <h2>Top 5 Pessoas com Mais Empréstimos</h2>
+                <div id="top-5-emprestimos" class="top-5-list"></div>
+            </div>
+        </section>
+
+        <section id="entradas-content" class="tab-content">
+             <div class="content-box">
+                 <div class="section-header">
+                    <h2>Entradas - Histórico de Pagamentos</h2>
+                    <div class="header-actions">
+                        <div class="search-container">
+                            <input type="search" id="search-entradas" placeholder="Buscar por nome...">
+                            <i class="fa fa-search search-icon"></i>
+                        </div>
+                        <button id="add-nova-entrada" class="button-primary">+ Registrar Pagamento</button>
+                    </div>
+                 </div>
+                 <div class="filter-bar">
+                    <span>Filtrar por:</span>
+                    <select class="filter-month">
+                        <option value="">Todos os meses</option>
+                        <option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option><option value="04">Abril</option><option value="05">Maio</option><option value="06">Junho</option><option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+                    </select>
+                    <select class="filter-year"></select>
+                    <button class="apply-filter-button">Aplicar Filtro</button>
+                </div>
+                <div class="table-responsive">
+                    <table id="entradas-table">
+                        <thead><tr>
+                            <th>ID</th>
+                            <th class="sortable" data-sort="name">Nome Devedor <span></span></th>
+                            <th>Valor Pago</th>
+                            <th class="sortable" data-sort="date">Data <span></span></th>
+                            <th>Descrição</th><th>Anexo</th><th>Ações</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="saidas-content" class="tab-content">
+             <div class="content-box">
+                 <div class="section-header">
+                    <h2>Saídas - Empréstimos Concedidos</h2>
+                    <div class="header-actions">
+                        <div class="search-container">
+                            <input type="search" id="search-saidas" placeholder="Buscar por nome...">
+                            <i class="fa fa-search search-icon"></i>
+                        </div>
+                        <button id="add-novo-emprestimo" class="button-primary">+ Novo Empréstimo</button>
+                    </div>
+                 </div>
+                 <div class="filter-bar">
+                    Filtrar por data de vencimento:
+                    <input type="date" class="filter-date">
+                    <button class="apply-filter-button">Aplicar Filtro</button>
+                 </div>
+                 <div class="table-responsive">
+                    <table id="saidas-table">
+                        <thead><tr>
+                            <th>ID</th>
+                            <th class="sortable" data-sort="name">Nome <span></span></th>
+                            <th class="sortable" data-sort="loan_date">Data do Empréstimo <span></span></th>
+                            <th>V. Emprestado</th>
+                            <th>V. Total c/ Juros</th>
+                            <th>Saldo Devedor</th>
+                            <th>Juros Pagos</th>
+                            <th class="sortable" data-sort="date">Vencimento <span></span></th>
+                            <th>Status</th>
+                            <th>Anexo</th>
+                            <th>Ações</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        
+        <section id="relatorios-content" class="tab-content">
+            <div class="content-box">
+                <h2>Relatórios e Análises</h2>
+                
+                <!-- Filtros Avançados -->
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label for="report-start-date">Data Inicial:</label>
+                        <input type="date" id="report-start-date" class="filter-date">
+                    </div>
+                    <div class="filter-group">
+                        <label for="report-end-date">Data Final:</label>
+                        <input type="date" id="report-end-date" class="filter-date">
+                    </div>
+                    <div class="filter-group">
+                        <label for="report-status">Status:</label>
+                        <select id="report-status" class="filter-select">
+                            <option value="">Todos</option>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Pago">Pago</option>
+                            <option value="Atrasado">Atrasado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="report-debtor">Devedor:</label>
+                        <input type="text" id="report-debtor" class="filter-input" placeholder="Nome do devedor">
+                    </div>
+                    <button id="apply-report-filters" class="apply-filter-button">Aplicar Filtros</button>
+                    <button id="reset-report-filters" class="reset-filter-button">Limpar Filtros</button>
+                </div>
+                
+                <!-- KPIs -->
+                <div class="dashboard-cards">
+                    <div class="card">
+                        <h4>TOTAL EMPRESTADO</h4>
+                        <p id="report-total-loaned">R$ 0,00</p>
+                    </div>
+                    <div class="card">
+                        <h4>SALDO DEVEDOR</h4>
+                        <p id="report-total-balance">R$ 0,00</p>
+                    </div>
+                    <div class="card card-juros">
+                        <h4>JUROS RECEBIDOS</h4>
+                        <p id="report-total-interest">R$ 0,00</p>
+                    </div>
+                    <div class="card">
+                        <h4>EMPRÉSTIMOS ATIVOS</h4>
+                        <p id="report-active-loans">0</p>
+                    </div>
+                    <div class="card card-atrasado">
+                        <h4>EMPRÉSTIMOS ATRASADOS</h4>
+                        <p id="report-overdue-loans">0</p>
+                    </div>
+                    <div class="card">
+                        <h4>TAXA DE INADIMPLÊNCIA</h4>
+                        <p id="report-default-rate">0%</p>
+                    </div>
+                </div>
+                
+                <!-- Gráficos -->
+                <div class="charts-container">
+                    <div class="chart-row">
+                        <div class="chart-box">
+                            <h3>Emprestado vs. Pago por Mês</h3>
+                            <div class="chart-actions">
+                                <button class="chart-export-btn" data-chart="financial">Exportar</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="financial-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-box">
+                            <h3>Distribuição por Status</h3>
+                            <div class="chart-actions">
+                                <button class="chart-export-btn" data-chart="status">Exportar</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="status-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-row">
+                        <div class="chart-box">
+                            <h3>Fluxo de Caixa Mensal</h3>
+                            <div class="chart-actions">
+                                <button class="chart-export-btn" data-chart="cashflow">Exportar</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="cashflow-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-box">
+                            <h3>Top 10 Devedores</h3>
+                            <div class="chart-actions">
+                                <button class="chart-export-btn" data-chart="debtors">Exportar</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="debtors-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabelas -->
+                <div class="tables-container">
+                    <div class="table-box">
+                        <div class="table-header">
+                            <h3>Empréstimos com Vencimento em até 30 Dias</h3>
+                            <div class="table-actions">
+                                <button class="table-export-btn" data-table="upcoming">Exportar</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="upcoming-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nome</th>
+                                        <th>Valor Emprestado</th>
+                                        <th>Saldo Devedor</th>
+                                        <th>Data de Vencimento</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="table-box">
+                        <div class="table-header">
+                            <h3>Empréstimos Atrasados</h3>
+                            <div class="table-actions">
+                                <button class="table-export-btn" data-table="overdue">Exportar</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="overdue-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nome</th>
+                                        <th>Valor Emprestado</th>
+                                        <th>Saldo Devedor</th>
+                                        <th>Data de Vencimento</th>
+                                        <th>Dias de Atraso</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="table-box">
+                        <div class="table-header">
+                            <h3>Histórico de Pagamentos</h3>
+                            <div class="table-actions">
+                                <button class="table-export-btn" data-table="payments">Exportar</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="payments-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Devedor</th>
+                                        <th>Valor Pago</th>
+                                        <th>Data do Pagamento</th>
+                                        <th>Descrição</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="table-box">
+                        <div class="table-header">
+                            <h3>Resumo de Juros Recebidos</h3>
+                            <div class="table-actions">
+                                <button class="table-export-btn" data-table="interest">Exportar</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="interest-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mês</th>
+                                        <th>Total Pago</th>
+                                        <th>Total de Juros</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Botão de exportação geral -->
+                <div class="export-all-container">
+                    <button id="export-all-reports" class="button-primary">Exportar Todos os Relatórios</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modais -->
+    <div id="loan-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Registrar Novo Empréstimo</h2>
+            <form id="new-loan-form">
+                <h4>Dados Pessoais</h4>
+                <div class="form-group"><label for="name">Nome Completo:</label><input type="text" id="name" name="name" required></div>
+                <div class="form-group"><label for="cpf">CPF:</label><input type="text" id="cpf" name="cpf"></div>
+                <div class="form-group"><label for="phone">Telefone:</label><input type="tel" id="phone" name="phone"></div>
+                <h4>Endereço</h4>
+                <div class="form-group"><label for="address_cep">CEP:</label><input type="text" id="address_cep" name="address_cep"></div>
+                <div class="form-group"><label for="address_street">Rua e Número:</label><input type="text" id="address_street" name="address_street"></div>
+                <div class="form-group"><label for="address_bairro">Bairro:</label><input type="text" id="address_bairro" name="address_bairro"></div>
+                <div class="form-group"><label for="address_city">Cidade:</label><input type="text" id="address_city" name="address_city"></div>
+                <h4>Dados do Empréstimo</h4>
+                <div class="form-group"><label for="amount">Valor Emprestado:</label><input type="number" id="amount" name="amount" step="0.01" required></div>
+                <div class="form-group"><label for="loan_date">Data do Empréstimo:</label><input type="date" id="loan_date" name="loan_date" required></div>
+                <div class="form-group"><label for="return_date">Data de Devolução:</label><input type="date" id="return_date" name="return_date" required></div>
+                <div class="form-group"><label for="loan-attachment">Anexo (Opcional):</label><input type="file" id="loan-attachment" name="attachment" accept=".pdf,.jpg,.jpeg,.png"></div>
+                <button type="submit" class="button-primary">Adicionar Empréstimo</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Registrar Pagamento de Juros</h2>
+            <form id="new-payment-form">
+                <div class="form-group">
+                    <label for="payment-loan-input">Devedor (digite para pesquisar):</label>
+                    <input list="pending-loans-list" id="payment-loan-input" placeholder="Selecione ou pesquise um devedor..." required>
+                    <datalist id="pending-loans-list"></datalist>
+                    <input type="hidden" id="payment-loan-id" name="loan_id">
+                </div>
+                <div class="form-group"><label for="payment-amount">Valor Pago:</label><input type="number" id="payment-amount" name="amount_paid" step="0.01" required></div>
+                <div class="form-group"><label for="payment-date">Data do Pagamento:</label><input type="date" id="payment-date" name="payment_date" required></div>
+                <div class="form-group"><label for="payment-description">Descrição (Opcional):</label><textarea id="payment-description" name="description" rows="2"></textarea></div>
+                <div class="form-group"><label for="payment-attachment">Anexo (Opcional):</label><input type="file" id="payment-attachment" name="attachment" accept=".pdf,.jpg,.jpeg,.png"></div>
+                <button type="submit" class="button-primary">Confirmar Pagamento</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="password-change-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Alteração de Senha Obrigatória</h2>
+            <form id="password-change-form">
+                <div class="form-group"><label for="new-password">Nova Senha (mínimo 6 caracteres):</label><input type="password" id="new-password" required minlength="6"></div>
+                <button type="submit" class="button-primary">Salvar Nova Senha</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Detalhes do Cliente</h2>
+            <div id="details-content"></div>
+        </div>
+    </div>
+    
+    <div id="edit-loan-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Editar Empréstimo</h2>
+            <form id="edit-loan-form">
+                <input type="hidden" id="edit-loan-id" name="loan_id">
+                <h4>Dados Pessoais</h4>
+                <div class="form-group"><label for="edit-name">Nome Completo:</label><input type="text" id="edit-name" name="name" required></div>
+                <div class="form-group"><label for="edit-cpf">CPF:</label><input type="text" id="edit-cpf" name="cpf"></div>
+                <div class="form-group"><label for="edit-phone">Telefone:</label><input type="tel" id="edit-phone" name="phone"></div>
+                <h4>Endereço</h4>
+                <div class="form-group"><label for="edit-address_cep">CEP:</label><input type="text" id="edit-address_cep" name="address_cep"></div>
+                <div class="form-group"><label for="edit-address_street">Rua e Número:</label><input type="text" id="edit-address_street" name="address_street"></div>
+                <div class="form-group"><label for="edit-address_bairro">Bairro:</label><input type="text" id="edit-address_bairro" name="address_bairro"></div>
+                <div class="form-group"><label for="edit-address_city">Cidade:</label><input type="text" id="edit-address_city" name="address_city"></div>
+                <h4>Dados do Empréstimo</h4>
+                <div class="form-group"><label for="edit-amount">Valor Emprestado:</label><input type="number" id="edit-amount" name="amount" step="0.01" required></div>
+                <div class="form-group"><label for="edit-loan_date">Data do Empréstimo:</label><input type="date" id="edit-loan_date" name="loan_date" required></div>
+                <div class="form-group"><label for="edit-return_date">Data de Devolução:</label><input type="date" id="edit-return_date" name="return_date" required></div>
+                <div class="form-group" id="undo-quit-container" style="display: none;">
+                    <label style="flex-direction: row; align-items: center; gap: 10px;">
+                        <input type="checkbox" name="undo_quit"> Desfazer Quitação (Reabrir Empréstimo)
+                    </label>
+                </div>
+                <button type="submit" class="button-primary">Salvar Alterações</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="edit-payment-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Editar Pagamento</h2>
+            <form id="edit-payment-form">
+                <input type="hidden" id="edit-payment-id" name="payment_id">
+                <input type="hidden" id="edit-payment-loan-id" name="loan_id">
+                <div class="form-group">
+                    <label>Devedor:</label>
+                    <p id="edit-payment-name" style="font-weight: bold;"></p>
+                </div>
+                <div class="form-group"><label for="edit-payment-amount">Valor Pago:</label><input type="number" id="edit-payment-amount" name="amount_paid" step="0.01" required></div>
+                <div class="form-group"><label for="edit-payment-date">Data do Pagamento:</label><input type="date" id="edit-payment-date" name="payment_date" required></div>
+                <div class="form-group"><label for="edit-payment-description">Descrição (Opcional):</label><textarea id="edit-payment-description" name="description" rows="2"></textarea></div>
+                <button type="submit" class="button-primary">Salvar Alterações</button>
+            </form>
+        </div>
+    </div>
+
+        <!-- Modal para lista de atrasados -->
+    <div id="atrasados-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Empréstimos Atrasados</h2>
+            <div id="atrasados-lista" class="atrasados-lista">
+                <p>Carregando...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/locale/pt-br.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

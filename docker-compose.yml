@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./database:/app/database
+      - ./public/uploads:/app/public/uploads
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=24dfef47c933ad661b55df51e469af62

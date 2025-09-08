@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema de Empréstimos</title>
+    <link rel="stylesheet" href="login.style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="login-container">
+        <form id="login-form" class="login-form">
+            <h1>Sistema de Empréstimos</h1>
+            <p>Por favor, faça login para continuar</p>
+            <div class="form-group">
+                <label for="username">Usuário</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit" class="button-primary">Entrar</button>
+            <p id="error-message" class="error-message"></p>
+        </form>
+    </div>
+    <script src="login.script.js"></script>
+</body>
+</html>
