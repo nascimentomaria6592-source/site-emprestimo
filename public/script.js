@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- FUNÇÕES DE LÓGICA E DADOS ---
     const fetchWithAuth = async (url, options = {}) => {
-        const headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+        const headers = { ...options.headers, 'Authorization': `Bearer ${token}`, 'ngrok-skip-browser-warning': '1' };
         if (!(options.body instanceof FormData)) { 
             headers['Content-Type'] = 'application/json'; 
         }
