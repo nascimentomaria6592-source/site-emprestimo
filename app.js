@@ -31,6 +31,7 @@ app.use(helmet({
   },
   // Desative o Origin-Agent-Cluster para evitar o erro
   originAgentCluster: false,
+  crossOriginOpenerPolicy: false,
 }));
 
  
