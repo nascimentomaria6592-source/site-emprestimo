@@ -29,10 +29,11 @@ app.use(helmet({
       connectSrc: ["'self'", "ws:", "wss:"],
     },
   },
+  // Desative o Origin-Agent-Cluster para evitar o erro
+  originAgentCluster: false,
 }));
 
- // Desative o Origin-Agent-Cluster para evitar o erro
-  originAgentCluster: false,
+ 
 
 app.use(cors());
 app.use(express.json());
