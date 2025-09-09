@@ -8,7 +8,8 @@ services:
     volumes:
       - ./database:/app/database
       - ./public/uploads:/app/public/uploads
+    env_file:
+      - .env
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - JWT_SECRET=24dfef47c933ad661b55df51e469af62
