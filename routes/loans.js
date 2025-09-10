@@ -226,24 +226,54 @@ router.put('/:id', upload.single('attachment'), (req, res) => {
     });
 });
 
-// POST /api/loans/:id/payments
+// POST /api/loans/:id/payments -> ROTA MODIFICADA
 router.post('/:id/payments', upload.single('attachment'), (req, res) => {
     const loanId = req.params.id;
     const { amount_paid, payment_date, description } = req.body;
     const attachment_path = req.file ? req.file.path.replace(/\\/g, "/") : null;
-    if (!amount_paid || !payment_date) return res.status(400).json({ error: "Valor e data do pagamento são obrigatórios." });
+
+    if (!amount_paid || !payment_date) {
+        return res.status(400).json({ error: "Valor e data do pagamento são obrigatórios." });
+    }
+
     req.db.get("SELECT * FROM loans WHERE id = ?", [loanId], (err, loan) => {
-        if (err || !loan) return res.status(404).json({ error: "Empréstimo não encontrado." });
-        if (loan.status === 'Pago') return res.status(400).json({ error: "Este empréstimo já está quitado." });
+        if (err || !loan) {
+            return res.status(404).json({ error: "Empréstimo não encontrado." });
+        }
+        if (loan.status === 'Pago') {
+            return res.status(400).json({ error: "Este empréstimo já está quitado." });
+        }
+
+        // --- LÓGICA PRINCIPAL DA NOVA FUNCIONALIDADE ---
+        
+        // 1. Calcular a nova data de vencimento
+        const novaDataVencimento = moment(loan.return_date).add(1, 'months').format('YYYY-MM-DD');
+
+        // 2. Preparar as atualizações
         const newInterestPaid = loan.interest_paid + parseFloat(amount_paid);
+        
         const paymentSql = `INSERT INTO payments (loan_id, amount_paid, payment_date, description, attachment_path) VALUES (?, ?, ?, ?, ?)`;
         const paymentParams = [loanId, parseFloat(amount_paid), payment_date, description, attachment_path];
-        const loanUpdateSql = "UPDATE loans SET interest_paid = ? WHERE id = ?";
+        
+        // Atualiza tanto os juros pagos QUANTO a data de vencimento
+        const loanUpdateSql = "UPDATE loans SET interest_paid = ?, return_date = ? WHERE id = ?";
+        const loanUpdateParams = [newInterestPaid, novaDataVencimento, loanId];
+
+        // 3. Executar as transações no banco de dados
         req.db.serialize(() => {
+            // Insere o registro na tabela de pagamentos
             req.db.run(paymentSql, paymentParams);
-            req.db.run(loanUpdateSql, [newInterestPaid, loanId], (err) => {
-                if (err) return res.status(500).json({ error: "Erro ao atualizar empréstimo." });
-                res.status(201).json({ message: "Pagamento de juros registrado com sucesso." });
+            
+            // Atualiza o empréstimo com a nova data e o valor pago
+            req.db.run(loanUpdateSql, loanUpdateParams, (err) => {
+                if (err) {
+                    console.error("Erro ao atualizar empréstimo:", err);
+                    return res.status(500).json({ error: "Erro ao atualizar a data de vencimento do empréstimo." });
+                }
+                res.status(201).json({ 
+                    message: "Pagamento registrado e data de vencimento atualizada com sucesso.",
+                    new_return_date: novaDataVencimento // Opcional: retornar a nova data
+                });
             });
         });
     });
