@@ -4,100 +4,145 @@ const moment = require('moment');
 const upload = require('../multer-config');
 moment.locale('pt-br');
 
-// GET /api/loans/dashboard -> ROTA DE ESTATÍSTICAS COM FILTROS, BUSCA E ORDENAÇÃO
 router.get('/dashboard', async (req, res) => {
     const db = req.db;
     const { search, sortBy, order, mes, ano, return_date } = req.query;
     const today = moment().format('YYYY-MM-DD');
     const twoDaysFromNow = moment().add(2, 'days').format('YYYY-MM-DD');
     
-    // Constrói a cláusula WHERE para os filtros comuns
-    let whereConditions = [];
-    let params = [];
+    // Construir condições WHERE apenas para parâmetros não vazios
+    const whereConditions = [];
+    const params = [];
     
-    if (search) { 
-        whereConditions.push('name LIKE ?'); 
-        params.push(`%${search}%`); 
+    // Adicionar condições apenas se os valores não forem vazios
+    if (search && search.trim() !== '') { 
+        whereConditions.push(`name LIKE $${params.length + 1}`); 
+        params.push(`%${search.trim()}%`); 
     }
-    if (mes) { 
-        whereConditions.push('strftime("%m", loan_date) = ?'); 
+    if (mes && mes.trim() !== '') { 
+        whereConditions.push(`EXTRACT(MONTH FROM loan_date) = $${params.length + 1}`); 
         params.push(mes.padStart(2, '0')); 
     }
-    if (ano) { 
-        whereConditions.push('strftime("%Y", loan_date) = ?'); 
-        params.push(ano); 
+    if (ano && ano.trim() !== '') { 
+        whereConditions.push(`EXTRACT(YEAR FROM loan_date) = $${params.length + 1}`); 
+        params.push(ano.trim()); 
     }
-    if (return_date) { 
-        whereConditions.push('DATE(return_date) = DATE(?)'); 
-        params.push(return_date); 
+    if (return_date && return_date.trim() !== '') { 
+        whereConditions.push(`DATE(return_date) = DATE($${params.length + 1})`); 
+        params.push(return_date.trim()); 
     }
     
-    // Constrói a cláusula WHERE completa
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
     
-    // Ordenação para a lista de empréstimos
     const validSortColumnsLoans = { name: 'name', date: 'return_date', loan_date: 'loan_date' };
     const sortColumnLoans = validSortColumnsLoans[sortBy] || 'id';
     const sortOrderLoans = order === 'asc' ? 'ASC' : 'DESC';
     const orderByClauseLoans = `ORDER BY ${sortColumnLoans} ${sortOrderLoans}`;
     
-    const dbGet = (sql, queryParams = []) => new Promise((resolve, reject) => db.get(sql, queryParams, (err, row) => err ? reject(err) : resolve(row)));
-    const dbAll = (sql, queryParams = []) => new Promise((resolve, reject) => db.all(sql, queryParams, (err, rows) => err ? reject(err) : resolve(rows || [])));
-
     try {
-        // Consultas SQL com condições WHERE corretas
-        const [
-            totalEmprestadoAtivoRow, totalPagoPrincipalRow,
-            saldoDevedorAtivoRow, totalJurosRecebidosRow,
-            ativosRow, atrasadosRow, proximosAVencerRow,
-            top5, allLoans, listaAtrasados  // NOVO: lista de atrasados
-        ] = await Promise.all([
-            dbGet(`SELECT COALESCE(SUM(amount), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`, params),
-            dbGet(`SELECT COALESCE(SUM(principal_paid), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status = 'Pago'`, params),
-            dbGet(`SELECT COALESCE(SUM(balance_due), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`, params),
-            dbGet(`SELECT COALESCE(SUM(interest_paid), 0) AS total FROM loans ${whereClause}`, params),
-            dbGet(`SELECT COUNT(*) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`, params),
-            dbGet(`SELECT COUNT(*) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago' AND return_date < ?`, [...params, today]),
-            dbGet(`SELECT COUNT(*) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago' AND return_date BETWEEN ? AND ?`, [...params, today, twoDaysFromNow]),
-            dbAll(`SELECT name, SUM(amount) AS total_emprestado FROM loans ${whereClause} GROUP BY name ORDER BY total_emprestado DESC LIMIT 5`, params),
-            dbAll(`SELECT * FROM loans ${whereClause} ${orderByClauseLoans}`, params),
-            // NOVA: Consulta para lista de atrasados
-            dbAll(`
-                SELECT id, name, amount, balance_due, return_date,
-                CAST(JULIANDAY('${today}') - JULIANDAY(return_date) AS INTEGER) as dias_atraso 
-                FROM loans 
-                WHERE status != 'Pago' AND return_date < '${today}' 
-                ORDER BY dias_atraso DESC, return_date ASC 
-                LIMIT 5
-            `)
-        ]);
+        console.log('Parâmetros recebidos:', { search, sortBy, order, mes, ano, return_date });
+        console.log('Condições WHERE:', whereConditions);
+        console.log('Parâmetros:', params);
+        
+        // Função para executar query com tratamento de erro
+        const executeQuery = async (query, queryParams) => {
+            try {
+                const result = await db.query(query, queryParams);
+                return result.rows;
+            } catch (err) {
+                console.error('Erro na query:', query);
+                console.error('Parâmetros:', queryParams);
+                console.error('Erro:', err);
+                throw err;
+            }
+        };
+        
+        // Query para total emprestado ativo
+        const totalEmprestadoAtivoQuery = `SELECT COALESCE(SUM(amount), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
+        const totalEmprestadoAtivo = await executeQuery(totalEmprestadoAtivoQuery, params);
+        
+        // Query para total pago principal
+        const totalPagoPrincipalQuery = `SELECT COALESCE(SUM(principal_paid), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status = 'Pago'`;
+        const totalPagoPrincipal = await executeQuery(totalPagoPrincipalQuery, params);
+        
+        // Query para saldo devedor ativo
+        const saldoDevedorAtivoQuery = `SELECT COALESCE(SUM(balance_due), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
+        const saldoDevedorAtivo = await executeQuery(saldoDevedorAtivoQuery, params);
+        
+        // Query para total juros recebidos
+        const totalJurosRecebidosQuery = `SELECT COALESCE(SUM(interest_paid), 0) AS total FROM loans ${whereClause}`;
+        const totalJurosRecebidos = await executeQuery(totalJurosRecebidosQuery, params);
+        
+        // Query para empréstimos ativos
+        const ativosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
+        const ativos = await executeQuery(ativosQuery, params);
+        
+        // Query para empréstimos atrasados
+        let atrasadosQuery, atrasadosParams;
+        if (whereConditions.length > 0) {
+            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date < $${params.length + 1}`;
+            atrasadosParams = [...params, today];
+        } else {
+            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != 'Pago' AND return_date < $1`;
+            atrasadosParams = [today];
+        }
+        const atrasados = await executeQuery(atrasadosQuery, atrasadosParams);
+        
+        // Query para próximos a vencer
+        let proximosQuery, proximosParams;
+        if (whereConditions.length > 0) {
+            proximosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date BETWEEN $${params.length + 1} AND $${params.length + 2}`;
+            proximosParams = [...params, today, twoDaysFromNow];
+        } else {
+            proximosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != 'Pago' AND return_date BETWEEN $1 AND $2`;
+            proximosParams = [today, twoDaysFromNow];
+        }
+        const proximosAVencer = await executeQuery(proximosQuery, proximosParams);
+        
+        // Query para top 5
+        const top5Query = `SELECT name, SUM(amount) AS total_emprestado FROM loans ${whereClause} GROUP BY name ORDER BY total_emprestado DESC LIMIT 5`;
+        const top5 = await executeQuery(top5Query, params);
+        
+        // Query para todos os empréstimos
+        const allLoansQuery = `SELECT * FROM loans ${whereClause} ${orderByClauseLoans}`;
+        const allLoans = await executeQuery(allLoansQuery, params);
+        
+        // Query para lista de atrasados
+        const listaAtrasadosQuery = `
+            SELECT id, name, amount, balance_due, return_date,
+            (CURRENT_DATE - return_date) as dias_atraso 
+            FROM loans 
+            WHERE status != 'Pago' AND return_date < CURRENT_DATE 
+            ORDER BY dias_atraso DESC, return_date ASC 
+            LIMIT 5
+        `;
+        const listaAtrasados = await executeQuery(listaAtrasadosQuery, []);
         
         res.json({
-            total_emprestado_ativo: totalEmprestadoAtivoRow.total,
-            total_pago_principal: totalPagoPrincipalRow.total,
-            saldo_devedor_ativo: saldoDevedorAtivoRow.total,
-            total_juros_recebidos: totalJurosRecebidosRow.total,
-            emprestimos_ativos: ativosRow.total,
-            emprestimos_atrasados: atrasadosRow.total,
-            proximos_a_vencer: proximosAVencerRow.total,
+            total_emprestado_ativo: totalEmprestadoAtivo[0]?.total || 0,
+            total_pago_principal: totalPagoPrincipal[0]?.total || 0,
+            saldo_devedor_ativo: saldoDevedorAtivo[0]?.total || 0,
+            total_juros_recebidos: totalJurosRecebidos[0]?.total || 0,
+            emprestimos_ativos: ativos[0]?.total || 0,
+            emprestimos_atrasados: atrasados[0]?.total || 0,
+            proximos_a_vencer: proximosAVencer[0]?.total || 0,
             top_5_emprestimos: top5,
             all_loans: allLoans,
-            lista_atrasados: listaAtrasados  // NOVO: adicionar na resposta
+            lista_atrasados: listaAtrasados
         });
     } catch (err) {
         console.error("Erro na rota /dashboard:", err);
         res.status(500).json({ error: "Erro interno do servidor ao processar os dados." });
     }
 });
-// GET /api/loans/pending
+
 router.get('/pending', (req, res) => {
-    req.db.all("SELECT id, name, balance_due FROM loans WHERE status != 'Pago' ORDER BY name", [], (err, rows) => {
+    req.db.query("SELECT id, name, balance_due FROM loans WHERE status != 'Pago' ORDER BY name", [], (err, result) => {
         if (err) return res.status(500).json({ error: 'Erro ao buscar empréstimos pendentes.' });
-        res.json(rows || []);
+        res.json(result.rows || []);
     });
 });
 
-// GET /api/loans/payments -> COM BUSCA E ORDENAÇÃO
 router.get('/payments', (req, res) => {
     const { search, sortBy, order, mes, ano } = req.query;
     let sql = `
@@ -107,10 +152,20 @@ router.get('/payments', (req, res) => {
     `;
     const params = [];
     const conditions = [];
+    let paramIndex = 1;
 
-    if (search) { conditions.push('l.name LIKE ?'); params.push(`%${search}%`); }
-    if (mes) { conditions.push('strftime("%m", p.payment_date) = ?'); params.push(mes.padStart(2, '0')); }
-    if (ano) { conditions.push('strftime("%Y", p.payment_date) = ?'); params.push(ano); }
+    if (search) { 
+        conditions.push(`l.name LIKE $${paramIndex++}`); 
+        params.push(`%${search}%`); 
+    }
+    if (mes) { 
+        conditions.push(`EXTRACT(MONTH FROM p.payment_date) = $${paramIndex++}`); 
+        params.push(mes.padStart(2, '0')); 
+    }
+    if (ano) { 
+        conditions.push(`EXTRACT(YEAR FROM p.payment_date) = $${paramIndex++}`); 
+        params.push(ano); 
+    }
 
     if (conditions.length > 0) {
         sql += ' WHERE ' + conditions.join(' AND ');
@@ -121,38 +176,38 @@ router.get('/payments', (req, res) => {
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
     sql += ` ORDER BY ${sortColumn} ${sortOrder}, p.id DESC`;
 
-    req.db.all(sql, params, (err, rows) => {
+    req.db.query(sql, params, (err, result) => {
         if (err) return res.status(500).json({ error: 'Erro ao buscar pagamentos.' });
-        res.json(rows || []);
+        res.json(result.rows || []);
     });
 });
 
-// GET /api/loans/payments/:id
 router.get('/payments/:id', (req, res) => {
     const paymentId = req.params.id;
-    req.db.get("SELECT * FROM payments WHERE id = ?", [paymentId], (err, row) => {
+    req.db.query("SELECT * FROM payments WHERE id = $1", [paymentId], (err, result) => {
         if (err) return res.status(500).json({ error: 'Erro de servidor.' });
-        if (!row) return res.status(404).json({ error: 'Pagamento não encontrado.' });
-        res.json(row);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Pagamento não encontrado.' });
+        res.json(result.rows[0]);
     });
 });
 
-// PUT /api/loans/payments/:id
 router.put('/payments/:id', upload.single('attachment'), (req, res) => {
     const paymentId = req.params.id;
     const { amount_paid, payment_date, description, loan_id } = req.body;
 
-    req.db.get("SELECT * FROM payments WHERE id = ?", [paymentId], (err, originalPayment) => {
-        if (err || !originalPayment) return res.status(404).json({ error: "Pagamento não encontrado." });
+    req.db.query("SELECT * FROM payments WHERE id = $1", [paymentId], (err, result) => {
+        if (err || result.rows.length === 0) return res.status(404).json({ error: "Pagamento não encontrado." });
 
+        const originalPayment = result.rows[0];
         const difference = parseFloat(amount_paid) - originalPayment.amount_paid;
 
-        const updatePaymentSql = `UPDATE payments SET amount_paid = ?, payment_date = ?, description = ? WHERE id = ?`;
-        const updateLoanSql = `UPDATE loans SET interest_paid = interest_paid + ? WHERE id = ?`;
+        const updatePaymentSql = `UPDATE payments SET amount_paid = $1, payment_date = $2, description = $3 WHERE id = $4`;
+        const updateLoanSql = `UPDATE loans SET interest_paid = interest_paid + $1 WHERE id = $2`;
 
-        req.db.serialize(() => {
-            req.db.run(updatePaymentSql, [amount_paid, payment_date, description, paymentId]);
-            req.db.run(updateLoanSql, [difference, loan_id], (err) => {
+        req.db.query(updatePaymentSql, [amount_paid, payment_date, description, paymentId], (err) => {
+            if (err) return res.status(500).json({ error: "Erro ao atualizar pagamento." });
+            
+            req.db.query(updateLoanSql, [difference, loan_id], (err) => {
                 if (err) return res.status(500).json({ error: "Erro ao atualizar o empréstimo." });
                 res.status(200).json({ message: "Pagamento atualizado com sucesso." });
             });
@@ -160,45 +215,51 @@ router.put('/payments/:id', upload.single('attachment'), (req, res) => {
     });
 });
 
-// GET /api/loans/:id
 router.get('/:id', (req, res) => {
     const loanId = req.params.id;
-    req.db.get("SELECT * FROM loans WHERE id = ?", [loanId], (err, row) => {
+    req.db.query("SELECT * FROM loans WHERE id = $1", [loanId], (err, result) => {
         if (err) return res.status(500).json({ error: 'Erro de servidor.' });
-        if (!row) return res.status(404).json({ error: 'Empréstimo não encontrado.' });
-        res.json(row);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Empréstimo não encontrado.' });
+        res.json(result.rows[0]);
     });
 });
 
-// POST /api/loans
 router.post('/', upload.single('attachment'), (req, res) => {
     const { name, cpf, phone, address_street, address_cep, address_bairro, address_city, amount, loan_date, return_date } = req.body;
     const attachment_path = req.file ? req.file.path.replace(/\\/g, "/") : null;
-    if (!name || !amount || !loan_date || !return_date) return res.status(400).json({ error: 'Nome, valor e datas são obrigatórios.' });
+    
+    if (!name || !amount || !loan_date || !return_date) {
+        return res.status(400).json({ error: 'Nome, valor e datas são obrigatórios.' });
+    }
+    
     const principalAmount = parseFloat(amount);
     const amount_with_interest = principalAmount * 1.2;
+    
     const sql = `
         INSERT INTO loans (
             name, cpf, phone, address_street, address_cep, address_bairro, address_city,
             amount, amount_with_interest, balance_due, loan_date, return_date, status, attachment_path
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendente', ?)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Pendente', $12)
     `;
-    const params = [ name, cpf, phone, address_street, address_cep, address_bairro, address_city, principalAmount, amount_with_interest, principalAmount, loan_date, return_date, attachment_path ];
-    req.db.run(sql, params, function (err) {
+    
+    const params = [name, cpf, phone, address_street, address_cep, address_bairro, address_city, 
+                   principalAmount, amount_with_interest, principalAmount, loan_date, return_date, attachment_path];
+    
+    req.db.query(sql, params, (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.status(201).json({ id: this.lastID });
+        res.status(201).json({ id: result.rows[0].id });
     });
 });
 
-// PUT /api/loans/:id
 router.put('/:id', upload.single('attachment'), (req, res) => {
     const loanId = req.params.id;
     const { name, cpf, phone, address_street, address_cep, address_bairro, address_city, amount, loan_date, return_date, undo_quit } = req.body;
     const newPrincipalAmount = parseFloat(amount);
 
-    req.db.get("SELECT * FROM loans WHERE id = ?", [loanId], (err, originalLoan) => {
-        if (err || !originalLoan) return res.status(404).json({ error: "Empréstimo não encontrado." });
+    req.db.query("SELECT * FROM loans WHERE id = $1", [loanId], (err, result) => {
+        if (err || result.rows.length === 0) return res.status(404).json({ error: "Empréstimo não encontrado." });
 
+        const originalLoan = result.rows[0];
         let { status, principal_paid } = originalLoan;
         let balance_due = originalLoan.balance_due;
         let amount_with_interest = newPrincipalAmount * 1.2;
@@ -207,26 +268,29 @@ router.put('/:id', upload.single('attachment'), (req, res) => {
             status = 'Pendente';
             balance_due = newPrincipalAmount;
             principal_paid = 0;
-            req.db.run("DELETE FROM payments WHERE loan_id = ? AND description LIKE 'Pagamento de quitação%'", [loanId]);
+            req.db.query("DELETE FROM payments WHERE loan_id = $1 AND description LIKE 'Pagamento de quitação%'", [loanId]);
         } else if (status !== 'Pago') {
             balance_due = newPrincipalAmount - originalLoan.principal_paid;
         }
 
         const sql = `
             UPDATE loans SET
-                name = ?, cpf = ?, phone = ?, address_street = ?, address_cep = ?, 
-                address_bairro = ?, address_city = ?, amount = ?, amount_with_interest = ?, loan_date = ?, return_date = ?,
-                balance_due = ?, principal_paid = ?, status = ?
-            WHERE id = ?`;
-        const params = [ name, cpf, phone, address_street, address_cep, address_bairro, address_city, newPrincipalAmount, amount_with_interest, loan_date, return_date, balance_due, principal_paid, status, loanId ];
-        req.db.run(sql, params, function (err) {
+                name = $1, cpf = $2, phone = $3, address_street = $4, address_cep = $5, 
+                address_bairro = $6, address_city = $7, amount = $8, amount_with_interest = $9, 
+                loan_date = $10, return_date = $11, balance_due = $12, principal_paid = $13, status = $14
+            WHERE id = $15`;
+            
+        const params = [name, cpf, phone, address_street, address_cep, address_bairro, address_city, 
+                       newPrincipalAmount, amount_with_interest, loan_date, return_date, balance_due, 
+                       principal_paid, status, loanId];
+        
+        req.db.query(sql, params, (err) => {
             if (err) return res.status(500).json({ error: "Erro ao atualizar o empréstimo." });
             res.status(200).json({ message: "Empréstimo atualizado com sucesso." });
         });
     });
 });
 
-// POST /api/loans/:id/payments -> ROTA MODIFICADA
 router.post('/:id/payments', upload.single('attachment'), (req, res) => {
     const loanId = req.params.id;
     const { amount_paid, payment_date, description } = req.body;
@@ -236,62 +300,60 @@ router.post('/:id/payments', upload.single('attachment'), (req, res) => {
         return res.status(400).json({ error: "Valor e data do pagamento são obrigatórios." });
     }
 
-    req.db.get("SELECT * FROM loans WHERE id = ?", [loanId], (err, loan) => {
-        if (err || !loan) {
+    req.db.query("SELECT * FROM loans WHERE id = $1", [loanId], (err, result) => {
+        if (err || result.rows.length === 0) {
             return res.status(404).json({ error: "Empréstimo não encontrado." });
         }
+        
+        const loan = result.rows[0];
         if (loan.status === 'Pago') {
             return res.status(400).json({ error: "Este empréstimo já está quitado." });
         }
 
-        // --- LÓGICA PRINCIPAL DA NOVA FUNCIONALIDADE ---
-        
-        // 1. Calcular a nova data de vencimento
         const novaDataVencimento = moment(loan.return_date).add(1, 'months').format('YYYY-MM-DD');
-
-        // 2. Preparar as atualizações
         const newInterestPaid = loan.interest_paid + parseFloat(amount_paid);
         
-        const paymentSql = `INSERT INTO payments (loan_id, amount_paid, payment_date, description, attachment_path) VALUES (?, ?, ?, ?, ?)`;
+        const paymentSql = `INSERT INTO payments (loan_id, amount_paid, payment_date, description, attachment_path) VALUES ($1, $2, $3, $4, $5)`;
         const paymentParams = [loanId, parseFloat(amount_paid), payment_date, description, attachment_path];
         
-        // Atualiza tanto os juros pagos QUANTO a data de vencimento
-        const loanUpdateSql = "UPDATE loans SET interest_paid = ?, return_date = ? WHERE id = ?";
+        const loanUpdateSql = "UPDATE loans SET interest_paid = $1, return_date = $2 WHERE id = $3";
         const loanUpdateParams = [newInterestPaid, novaDataVencimento, loanId];
 
-        // 3. Executar as transações no banco de dados
-        req.db.serialize(() => {
-            // Insere o registro na tabela de pagamentos
-            req.db.run(paymentSql, paymentParams);
+        req.db.query(paymentSql, paymentParams, (err) => {
+            if (err) return res.status(500).json({ error: "Erro ao registrar pagamento." });
             
-            // Atualiza o empréstimo com a nova data e o valor pago
-            req.db.run(loanUpdateSql, loanUpdateParams, (err) => {
+            req.db.query(loanUpdateSql, loanUpdateParams, (err) => {
                 if (err) {
                     console.error("Erro ao atualizar empréstimo:", err);
                     return res.status(500).json({ error: "Erro ao atualizar a data de vencimento do empréstimo." });
                 }
                 res.status(201).json({ 
                     message: "Pagamento registrado e data de vencimento atualizada com sucesso.",
-                    new_return_date: novaDataVencimento // Opcional: retornar a nova data
+                    new_return_date: novaDataVencimento
                 });
             });
         });
     });
 });
 
-// PUT /api/loans/:id/mark-as-paid
 router.put('/:id/mark-as-paid', (req, res) => {
     const loanId = req.params.id;
-    req.db.get("SELECT * FROM loans WHERE id = ?", [loanId], (err, loan) => {
-        if (err || !loan) return res.status(404).json({ error: "Empréstimo não encontrado."});
+    req.db.query("SELECT * FROM loans WHERE id = $1", [loanId], (err, result) => {
+        if (err || result.rows.length === 0) return res.status(404).json({ error: "Empréstimo não encontrado."});
+        
+        const loan = result.rows[0];
         if (loan.status === 'Pago') return res.status(400).json({ message: "Este empréstimo já está quitado."});
-        const paymentSql = `INSERT INTO payments (loan_id, amount_paid, payment_date, description) VALUES (?, ?, ?, ?)`;
+        
+        const paymentSql = `INSERT INTO payments (loan_id, amount_paid, payment_date, description) VALUES ($1, $2, $3, $4)`;
         const paymentParams = [loanId, loan.balance_due, moment().format('YYYY-MM-DD'), 'Pagamento de quitação do principal'];
-        const loanUpdateSql = "UPDATE loans SET balance_due = 0, principal_paid = ?, status = 'Pago' WHERE id = ?";
+        
+        const loanUpdateSql = "UPDATE loans SET balance_due = 0, principal_paid = $1, status = 'Pago' WHERE id = $2";
         const loanUpdateParams = [loan.amount, loanId];
-        req.db.serialize(() => {
-            req.db.run(paymentSql, paymentParams);
-            req.db.run(loanUpdateSql, loanUpdateParams, (err) => {
+        
+        req.db.query(paymentSql, paymentParams, (err) => {
+            if (err) return res.status(500).json({ error: "Erro ao registrar pagamento de quitação." });
+            
+            req.db.query(loanUpdateSql, loanUpdateParams, (err) => {
                 if (err) return res.status(500).json({ error: "Erro ao quitar empréstimo." });
                 res.status(200).json({ message: "Empréstimo quitado com sucesso." });
             });
@@ -299,37 +361,28 @@ router.put('/:id/mark-as-paid', (req, res) => {
     });
 });
 
-// routes/loans.js
 router.get('/atrasados', (req, res) => {
-    const db = req.db;
-    
-    // Consulta simples sem cálculo
     const query = `
         SELECT *
         FROM loans 
-        WHERE return_date < date('now') AND status != 'Pago'
+        WHERE return_date < CURRENT_DATE AND status != 'Pago'
         ORDER BY return_date ASC
     `;
     
-    db.all(query, [], (err, rows) => {
+    req.db.query(query, (err, result) => {
         if (err) {
             console.error('Erro na consulta:', err);
             return res.status(500).json({ error: err.message });
         }
         
-        // Calcular dias de atraso no JavaScript
-        const processedRows = rows.map(row => {
+        const processedRows = result.rows.map(row => {
             const hoje = new Date();
             const vencimento = new Date(row.return_date);
             
-            // Zerar horas, minutos, segundos e milissegundos
             hoje.setHours(0, 0, 0, 0);
             vencimento.setHours(0, 0, 0, 0);
             
-            // Calcular diferença em milissegundos
             const diffMs = hoje - vencimento;
-            
-            // Converter para dias e garantir valor positivo
             const diffDays = Math.abs(Math.floor(diffMs / (1000 * 60 * 60 * 24)));
             
             return {

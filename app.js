@@ -1,5 +1,6 @@
+require('dotenv').config();
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
@@ -12,76 +13,124 @@ const reportsRoutes = require('./routes/reports');
 const app = express();
 const port = process.env.PORT || 3000;
 
-const db = new sqlite3.Database('./database/db.sqlite3', (err) => {
-  if (err) console.error('Erro ao conectar ao banco de dados:', err.message);
-  else console.log('Conectado ao banco de dados SQLite.');
+// Configuração do Pool de Conexão PostgreSQL com opções de reconexão
+const pool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    password: process.env.DB_PASSWORD,
+    port: parseInt(process.env.DB_PORT),
+    ssl: { rejectUnauthorized: false },
+    max: 10, // máximo de conexões no pool
+    idleTimeoutMillis: 30000, // tempo máximo que uma conexão pode ficar ociosa
+    connectionTimeoutMillis: 2000, // tempo máximo para estabelecer uma conexão
+});
+
+// Aumentar o limite de listeners para evitar o aviso
+pool.setMaxListeners(20);
+
+// Testar conexão inicial
+pool.connect((err) => {
+    if (err) {
+        console.error('Erro ao conectar ao banco de dados:', err.message);
+    } else {
+        console.log('Conectado ao banco de dados PostgreSQL.');
+    }
+});
+
+// Middleware para lidar com erros de conexão
+app.use((req, res, next) => {
+    // Adicionar o pool ao objeto req
+    req.db = pool;
+    
+    // Listener para erros de conexão
+    pool.on('error', (err) => {
+        console.error('Erro inesperado no pool de conexões:', err);
+        // Tentar reconectar após um erro
+        if (err.code === 'CONNECTION_ERROR') {
+            console.log('Tentando reconectar ao banco de dados...');
+            setTimeout(() => {
+                pool.connect((err) => {
+                    if (err) {
+                        console.error('Falha ao reconectar:', err.message);
+                    } else {
+                        console.log('Reconectado com sucesso!');
+                    }
+                });
+            }, 5000);
+        }
+    });
+    
+    next();
+});
+
+// Middleware para verificar se a conexão está ativa antes de processar requisições
+app.use('/api', (req, res, next) => {
+    // Verificar se o pool está saudável
+    pool.query('SELECT NOW()', (err) => {
+        if (err) {
+            console.error('Erro ao verificar conexão com o banco:', err);
+            return res.status(503).json({ error: 'Serviço de banco de dados indisponível' });
+        }
+        next();
+    });
 });
 
 // Configuração do Helmet com CSP personalizado
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-      connectSrc: ["'self'", "ws:", "wss:"],
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+            imgSrc: ["'self'", "data:", "https:"],
+            fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+            connectSrc: ["'self'", "ws:", "wss:"],
+        },
     },
-  },
-  // Desative o Origin-Agent-Cluster para evitar o erro
-  originAgentCluster: false,
-  crossOriginOpenerPolicy: false,
+    originAgentCluster: false,
+    crossOriginOpenerPolicy: false,
 }));
-
- 
 
 app.use(cors());
 app.use(express.json());
 
-// Middleware para logar requisições (opcional)
+// Middleware para logar requisições
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-  next();
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    next();
 });
 
 // Servir arquivos estáticos com proteção básica
 app.use(express.static('public'));
 app.use('/public/uploads', express.static(path.join(__dirname, 'public/uploads'), {
-  setHeaders: (res, path) => {
-    // Prevenir que os arquivos sejam embutidos em iframes de outros sites
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    // Prevenir que os arquivos sejam abertos diretamente no navegador (para PDFs)
-    if (path.endsWith('.pdf')) {
-      res.setHeader('Content-Disposition', 'attachment');
+    setHeaders: (res, path) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (path.endsWith('.pdf')) {
+            res.setHeader('Content-Disposition', 'attachment');
+        }
     }
-  }
 }));
-
-app.use((req, res, next) => {
-  req.db = db;
-  next();
-});
 
 // Rotas
 app.use('/api/auth', authRoutes);
 
 // Rota pública para empréstimos atrasados
 app.get('/api/loans/atrasados', (req, res) => {
-    const db = req.db;
     const query = `
         SELECT *, 
-               (julianday(return_date) - julianday('now')) AS dias_atraso
+               (CURRENT_DATE - return_date) AS dias_atraso
         FROM loans 
-        WHERE return_date < date('now') AND status != 'Pago'
+        WHERE return_date < CURRENT_DATE AND status != 'Pago'
         ORDER BY return_date ASC
     `;
     
-    db.all(query, [], (err, rows) => {
+    pool.query(query, (err, result) => {
         if (err) {
+            console.error('Erro ao buscar empréstimos atrasados:', err);
             return res.status(500).json({ error: err.message });
         }
-        res.json(rows);
+        res.json(result.rows);
     });
 });
 
@@ -108,27 +157,43 @@ app.get('*', (req, res) => {
 
 // Middleware para tratar erros de upload
 app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'Arquivo muito grande. Tamanho máximo: 5MB' });
+        return res.status(400).json({ error: 'Arquivo muito grande. Tamanho máximo: 5MB' });
     }
     if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({ error: 'Formato de requisição inválido' });
+        return res.status(400).json({ error: 'Formato de requisição inválido' });
     }
-  } else if (err) {
-    // Erro personalizado do fileFilter
     if (err.message === 'Tipo de arquivo não permitido. Apenas JPG, PNG e PDF são aceitos.') {
-      return res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message });
     }
-    // Outros erros
     console.error('Erro não tratado:', err);
     return res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-  next();
 });
 
+// Middleware para tratamento global de erros
+app.use((err, req, res, next) => {
+    console.error('Erro não tratado:', err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+});
+
+// Iniciar o servidor
 app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
+    console.log(`Servidor rodando na porta ${port}`);
 });
 
-// Rotas de relatórios
+// Lidar com encerramento gracioso do aplicativo
+process.on('SIGINT', () => {
+    console.log('Recebido SIGINT. Encerrando aplicação...');
+    pool.end(() => {
+        console.log('Pool de conexões encerrado.');
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', () => {
+    console.log('Recebido SIGTERM. Encerrando aplicação...');
+    pool.end(() => {
+        console.log('Pool de conexões encerrado.');
+        process.exit(0);
+    });
+});

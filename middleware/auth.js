@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = 'seu_segredo_super_secreto_aqui'; // Use a mesma chave secreta
-
+const JWT_SECRET = '24dfef47c933ad661b55df51e469af62'; 
 module.exports = (req, res, next) => {
     const authHeader = req.headers.authorization;
 
@@ -12,9 +11,10 @@ module.exports = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded; // Adiciona os dados do usuário (id, username) ao objeto req
+        req.user = decoded;
         next();
     } catch (ex) {
+        console.error('Erro ao verificar token:', ex);
         res.status(400).json({ error: 'Token inválido.' });
     }
 };

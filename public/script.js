@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Verificar se estamos na página de login
+    if (window.location.pathname.includes('login.html')) {
+        // Não executar o resto do script na página de login
+        return;
+    }
+    
     // --- SETUP INICIAL ---
     const token = localStorage.getItem('authToken');
     if (!token) { 
@@ -24,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentModal = document.getElementById('payment-modal');
     const newPaymentForm = document.getElementById('new-payment-form');
     const passwordModal = document.getElementById('password-change-modal');
+    const passwordChangeForm = document.getElementById('password-change-form');
     const detailsModal = document.getElementById('details-modal');
     const editLoanModal = document.getElementById('edit-loan-modal');
     const editLoanForm = document.getElementById('edit-loan-form');
@@ -40,21 +47,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const atrasadosModal = document.getElementById('atrasados-modal');
     const atrasadosLista = document.getElementById('atrasados-lista');
     
+    // Verificar se os elementos críticos existem
+    if (!passwordModal || !passwordChangeForm) {
+        console.error('Elementos do modal de troca de senha não encontrados');
+    }
+    
     // --- FUNÇÕES DE LÓGICA E DADOS ---
     const fetchWithAuth = async (url, options = {}) => {
-        const headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+        // Sempre obter o token atualizado do localStorage
+        const currentToken = localStorage.getItem('authToken');
+        if (!currentToken) { 
+            localStorage.clear(); 
+            window.location.href = '/login.html'; 
+            throw new Error('Sessão expirada.'); 
+        }
+        
+        const headers = { ...options.headers, 'Authorization': `Bearer ${currentToken}` };
         if (!(options.body instanceof FormData)) { 
             headers['Content-Type'] = 'application/json'; 
         }
+        
         const response = await fetch(url, { ...options, headers });
+        
         if (response.status === 401 || response.status === 403) { 
             localStorage.clear(); 
             window.location.href = '/login.html'; 
             throw new Error('Sessão expirada.'); 
         }
+        
         return response;
     };
-
+    
     const createQueryString = (params) => {
         return new URLSearchParams(
             Object.fromEntries(
@@ -62,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
             )
         ).toString();
     };
-
+    
     const formatCurrency = (value) => {
         return (value === null || value === undefined ? 0 : Number(value))
             .toLocaleString('pt-BR', { 
@@ -70,18 +93,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 currency: 'BRL' 
             });
     };
-
+    
     const formatDate = (dateString) => {
         return moment(dateString).format('DD/MM/YYYY');
     };
-
+    
+    // Modifique a função refreshAllData no script.js
     const refreshAllData = async () => {
         try {
             const activeTab = document.querySelector('.nav-button.active')?.dataset.tab || 'dashboard';
             
             // Obter os parâmetros de filtro do estado atual
-            const dashboardParams = viewState.dashboard;
-            const entradasParams = viewState.entradas;
+            const dashboardParams = { ...viewState.dashboard };
+            const entradasParams = { ...viewState.entradas };
+            
+            // Remover parâmetros vazios
+            Object.keys(dashboardParams).forEach(key => {
+                if (dashboardParams[key] === '' || dashboardParams[key] === null || dashboardParams[key] === undefined) {
+                    delete dashboardParams[key];
+                }
+            });
+            
+            Object.keys(entradasParams).forEach(key => {
+                if (entradasParams[key] === '' || entradasParams[key] === null || entradasParams[key] === undefined) {
+                    delete entradasParams[key];
+                }
+            });
             
             // Construir query strings
             const dashboardQueryString = new URLSearchParams(dashboardParams).toString();
@@ -109,7 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateDashboard(data);
             updateEntradas(payments);
             updateSaidas(data);
-
         } catch (error) {
             console.error('Falha ao recarregar todos os dados:', error);
             if(error.message.indexOf('Sessão expirada') === -1) {
@@ -192,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Erro ao popular devedores:", error);
         }
     };
-
+    
     // --- FUNÇÕES DE RENDERIZAÇÃO ---
     const updateDashboard = (data) => {
         document.getElementById('total-emprestado-ativo').textContent = formatCurrency(data.total_emprestado_ativo);
@@ -337,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('Erro ao carregar lista de atrasados');
             
             const atrasados = await response.json();
-
             // Processar os dados para garantir dias inteiros
             const atrasadosProcessados = atrasados.map(loan => ({
                 ...loan,
@@ -417,11 +452,11 @@ document.addEventListener('DOMContentLoaded', () => {
             atrasadosLista.innerHTML = '<p class="sem-atrasados">Nenhum empréstimo atrasado</p>';
         }
     };
-
+    
     // --- FUNÇÕES DA ABA DE RELATÓRIOS ---
     // Variáveis para armazenar os gráficos
     let financialChart, statusChart, cashflowChart, debtorsChart;
-
+    
     // Função para carregar dados da aba de relatórios
     const loadReportsData = async () => {
         const startDate = document.getElementById('report-start-date').value;
@@ -490,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Não foi possível carregar os dados de relatórios: ' + error.message);
         }
     };
-
+    
     // Função para atualizar o gráfico financeiro (Emprestado vs. Pago)
     const updateFinancialChart = (data) => {
         const ctx = document.getElementById('financial-chart').getContext('2d');
@@ -546,7 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
-
+    
     // Função para atualizar o gráfico de status
     const updateStatusChart = (data) => {
         const ctx = document.getElementById('status-chart').getContext('2d');
@@ -597,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
-
+    
     // Função para atualizar o gráfico de fluxo de caixa
     const updateCashflowChart = (data) => {
         const ctx = document.getElementById('cashflow-chart').getContext('2d');
@@ -657,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
-
+    
     // Função para atualizar o gráfico de top devedores
     const updateDebtorsChart = (data) => {
         const ctx = document.getElementById('debtors-chart').getContext('2d');
@@ -705,7 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
-
+    
     // Função para atualizar a tabela de empréstimos com vencimento em até 30 dias
     const updateUpcomingTable = (data) => {
         const tbody = document.querySelector('#upcoming-table tbody');
@@ -731,7 +766,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tbody.innerHTML = '<tr><td colspan="6">Nenhum empréstimo com vencimento próximo encontrado.</td></tr>';
         }
     };
-
+    
     // Função para atualizar a tabela de empréstimos atrasados
     const updateOverdueTable = (data) => {
         const tbody = document.querySelector('#overdue-table tbody');
@@ -756,7 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tbody.innerHTML = '<tr><td colspan="6">Nenhum empréstimo atrasado encontrado.</td></tr>';
         }
     };
-
+    
     // Função para atualizar a tabela de histórico de pagamentos
     const updatePaymentsTable = (data) => {
         const tbody = document.querySelector('#payments-table tbody');
@@ -780,7 +815,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tbody.innerHTML = '<tr><td colspan="5">Nenhum pagamento encontrado para este período.</td></tr>';
         }
     };
-
+    
     // Função para atualizar a tabela de resumo de juros
     const updateInterestTable = (data) => {
         const tbody = document.querySelector('#interest-table tbody');
@@ -802,7 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tbody.innerHTML = '<tr><td colspan="3">Nenhum dado de juros encontrado para este período.</td></tr>';
         }
     };
-
+    
     // Função para mostrar indicador de carregamento
     const showLoadingIndicator = () => {
         const chartsContainer = document.querySelector('.charts-container');
@@ -830,7 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tablesContainer.style.opacity = '0.5';
         }
     };
-
+    
     // Função para ocultar indicador de carregamento
     const hideLoadingIndicator = () => {
         const chartsContainer = document.querySelector('.charts-container');
@@ -850,14 +885,12 @@ document.addEventListener('DOMContentLoaded', () => {
             tablesContainer.style.opacity = '1';
         }
     };
-
+    
     // --- NOVAS FUNÇÕES DE EXPORTAÇÃO XLSX ---
-
     // Exportar tabela como XLSX
     const exportTableAsXLSX = (tableId, fileName, sheetName = 'Dados') => {
         const table = document.getElementById(tableId);
         if (!table) return;
-
         const rows = [];
         // Cabeçalho
         const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
@@ -867,19 +900,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const rowData = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
             rows.push(rowData);
         });
-
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(rows);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
         XLSX.writeFile(wb, fileName);
     };
-
+    
     // Exportar relatório completo (todas as tabelas em abas)
     const exportAllReportsAsXLSX = () => {
         const today = new Date().toISOString().split('T')[0];
         const fileName = `relatorio-completo-${today}.xlsx`;
         const wb = XLSX.utils.book_new();
-
         // 1. Aba: Empréstimos com Vencimento Próximo
         const upcomingTable = document.getElementById('upcoming-table');
         if (upcomingTable) {
@@ -892,7 +923,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const upcomingWs = XLSX.utils.aoa_to_sheet(upcomingRows);
             XLSX.utils.book_append_sheet(wb, upcomingWs, 'Vencimento Próximo');
         }
-
         // 2. Aba: Empréstimos Atrasados
         const overdueTable = document.getElementById('overdue-table');
         if (overdueTable) {
@@ -905,7 +935,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const overdueWs = XLSX.utils.aoa_to_sheet(overdueRows);
             XLSX.utils.book_append_sheet(wb, overdueWs, 'Empréstimos Atrasados');
         }
-
         // 3. Aba: Histórico de Pagamentos
         const paymentsTable = document.getElementById('payments-table');
         if (paymentsTable) {
@@ -918,7 +947,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const paymentsWs = XLSX.utils.aoa_to_sheet(paymentsRows);
             XLSX.utils.book_append_sheet(wb, paymentsWs, 'Histórico de Pagamentos');
         }
-
         // 4. Aba: Resumo de Juros
         const interestTable = document.getElementById('interest-table');
         if (interestTable) {
@@ -931,7 +959,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const interestWs = XLSX.utils.aoa_to_sheet(interestRows);
             XLSX.utils.book_append_sheet(wb, interestWs, 'Resumo de Juros');
         }
-
         // 5. Aba: Informações do Relatório
         const infoData = [
             ['Informações do Relatório'],
@@ -941,12 +968,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
         const infoWs = XLSX.utils.aoa_to_sheet(infoData);
         XLSX.utils.book_append_sheet(wb, infoWs, 'Informações');
-
         // Gerar arquivo e disparar download
         XLSX.writeFile(wb, fileName);
         alert(`Relatório completo exportado com sucesso como ${fileName}`);
     };
-
+    
     // --- EVENT LISTENERS ---
     document.getElementById('logout-button')?.addEventListener('click', () => { 
         localStorage.clear(); 
@@ -955,21 +981,54 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('password-change-form')?.addEventListener('submit', async (e) => { 
         e.preventDefault(); 
-        const newPassword = document.getElementById('new-password').value; 
+        
+        // Verificar se o elemento existe antes de acessá-lo
+        const newPasswordInput = document.getElementById('new-password');
+        if (!newPasswordInput) {
+            console.error('Elemento "new-password" não encontrado');
+            alert('Erro no formulário. Por favor, recarregue a página.');
+            return;
+        }
+        
+        const newPassword = newPasswordInput.value;
+        
+        // Validação básica
+        if (!newPassword) {
+            alert('Por favor, digite uma nova senha.');
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            alert('A nova senha deve ter pelo menos 6 caracteres.');
+            return;
+        }
+        
         try { 
             const response = await fetchWithAuth('/api/auth/change-password', { 
                 method: 'POST', 
                 body: JSON.stringify({ newPassword }) 
             }); 
+            
             if (!response.ok) { 
                 const errData = await response.json(); 
-                throw new Error(errData.error || 'Erro.'); 
+                throw new Error(errData.error || 'Erro ao alterar senha.'); 
             } 
-            alert('Senha atualizada!'); 
-            localStorage.setItem('mustChangePassword', 'false'); 
-            passwordModal.style.display = 'none'; 
-            refreshAllData(); 
+            
+            const data = await response.json();
+            alert(data.message || 'Senha atualizada com sucesso!');
+            
+            // Atualizar o flag de troca de senha
+            localStorage.setItem('mustChangePassword', 'false');
+            
+            // Fechar o modal
+            if (passwordModal) {
+                passwordModal.style.display = 'none';
+            }
+            
+            // Recarregar os dados para garantir que tudo está atualizado
+            refreshAllData();
         } catch (error) { 
+            console.error('Erro ao alterar senha:', error);
             alert(`Erro: ${error.message}`); 
         } 
     });
@@ -1433,10 +1492,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    if (mustChangePassword) { 
-        if(passwordModal) {
-            passwordModal.style.display = 'flex'; 
-        }
+    // Verificação inicial do modal de troca de senha
+    if (mustChangePassword && passwordModal) { 
+        passwordModal.style.display = 'flex'; 
     } else { 
         refreshAllData(); 
     }

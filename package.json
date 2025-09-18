@@ -13,11 +13,12 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
     "express": "^4.18.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.30.1",
     "multer": "^2.0.2",
-    "sqlite3": "^5.1.7"
+    "pg": "^8.16.3"
   }
 }

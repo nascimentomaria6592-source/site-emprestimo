@@ -6,7 +6,6 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./database:/app/database
       - ./public/uploads:/app/public/uploads
     env_file:
       - .env
