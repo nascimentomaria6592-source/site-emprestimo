@@ -32,7 +32,7 @@ pool.setMaxListeners(20);
 // Testar conexão inicial
 pool.connect((err) => {
     if (err) {
-        console.error('Erro ao conectar ao banco de dados:', err.message);
+        console.error('Erro detalhado ao conectar ao banco de dados:', err);
     } else {
         console.log('Conectado ao banco de dados PostgreSQL.');
     }
