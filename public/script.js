@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${formatCurrency(loan.interest_paid)}</td>
                     <td>${formatDate(loan.return_date)}</td>
                     <td><span class="status-badge status-${statusClass}">${loan.status}</span></td>
-                    <td>${loan.attachment_path ? `<a href="/${loan.attachment_path.replace('public/', '')}" target="_blank">Ver Anexo</a>` : 'Não'}</td>
+                    <td>${loan.attachment_path ? `<a href="${loan.attachment_path}" target="_blank">Ver Anexo</a>` : 'Não'}</td>
                     <td>
                         <div class="action-buttons-group">
                             <button class="action-btn details-btn" data-loan-id="${loan.id}">Detalhes</button>
