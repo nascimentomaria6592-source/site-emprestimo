@@ -71,7 +71,7 @@ router.get('/dashboard', async (req, res) => {
         
         let atrasadosQuery, atrasadosParams;
         if (whereConditions.length > 0) {
-            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != \'Pago\' AND return_date < ${params.length + 1}`;
+            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != \\\'Pago\\\' AND return_date < $${params.length + 1}`;
             atrasadosParams = [...params, today];
         } else {
             atrasadosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != \'Pago\' AND return_date < $1`;
@@ -80,7 +80,7 @@ router.get('/dashboard', async (req, res) => {
         
         let proximosQuery, proximosParams;
         if (whereConditions.length > 0) {
-            proximosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != \'Pago\' AND return_date BETWEEN ${params.length + 1} AND ${params.length + 2}`;
+            proximosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != \\\'Pago\\\' AND return_date BETWEEN $${params.length + 1} AND $${params.length + 2}`;
             proximosParams = [...params, today, twoDaysFromNow];
         } else {
             proximosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != \'Pago\' AND return_date BETWEEN $1 AND $2`;
