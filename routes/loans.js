@@ -87,7 +87,7 @@ router.get('/dashboard', async (req, res) => {
             proximosParams = [today, twoDaysFromNow];
         }
         
-        const top5Query = `SELECT name, SUM(amount) AS total_emprestado FROM loans ${whereClause} GROUP BY name ORDER BY total_emprestado DESC LIMIT 5`;
+                const top5Query = `SELECT name, SUM(amount) AS total_emprestado FROM loans ${whereClause} GROUP BY name ORDER BY total_emprestado DESC LIMIT 5`;
         const allLoansQuery = `SELECT * FROM loans ${whereClause} ${orderByClauseLoans}`;
         const listaAtrasadosQuery = `SELECT id, name, amount, balance_due, return_date, (CURRENT_DATE - return_date) as dias_atraso FROM loans WHERE status != 'Pago' AND return_date < CURRENT_DATE ORDER BY dias_atraso DESC, return_date ASC LIMIT 5`;
 
