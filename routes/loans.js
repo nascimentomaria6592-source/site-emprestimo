@@ -63,31 +63,31 @@ router.get('/dashboard', async (req, res) => {
             }
         };
         
-        const totalEmprestadoAtivoQuery = `SELECT COALESCE(SUM(amount), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != \'Pago\'`;
-        const totalPagoPrincipalQuery = `SELECT COALESCE(SUM(principal_paid), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status = \'Pago\'`;
-        const saldoDevedorAtivoQuery = `SELECT COALESCE(SUM(balance_due), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != \'Pago\'`;
+        const totalEmprestadoAtivoQuery = `SELECT COALESCE(SUM(amount), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
+        const totalPagoPrincipalQuery = `SELECT COALESCE(SUM(principal_paid), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status = 'Pago'`;
+        const saldoDevedorAtivoQuery = `SELECT COALESCE(SUM(balance_due), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
         const totalJurosRecebidosQuery = `SELECT COALESCE(SUM(interest_paid), 0) AS total FROM loans ${whereClause}`;
-        const ativosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != \'Pago\'`;
+        const ativosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
         
         let atrasadosQuery, atrasadosParams;
         if (whereConditions.length > 0) {
-            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != \\\'Pago\\\' AND return_date < $${params.length + 1}`;
+            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date < $${params.length + 1}`;
             atrasadosParams = [...params, today];
         } else {
-            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != \'Pago\' AND return_date < $1`;
+            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != 'Pago' AND return_date < $1`;
             atrasadosParams = [today];
         }
         
         let proximosQuery, proximosParams;
         if (whereConditions.length > 0) {
-            proximosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != \\\'Pago\\\' AND return_date BETWEEN $${params.length + 1} AND $${params.length + 2}`;
+            proximosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date BETWEEN $${params.length + 1} AND $${params.length + 2}`;
             proximosParams = [...params, today, twoDaysFromNow];
         } else {
-            proximosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != \'Pago\' AND return_date BETWEEN $1 AND $2`;
+            proximosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != 'Pago' AND return_date BETWEEN $1 AND $2`;
             proximosParams = [today, twoDaysFromNow];
         }
         
-                const top5Query = `SELECT name, SUM(amount) AS total_emprestado FROM loans ${whereClause} GROUP BY name ORDER BY total_emprestado DESC LIMIT 5`;
+        const top5Query = `SELECT name, SUM(amount) AS total_emprestado FROM loans ${whereClause} GROUP BY name ORDER BY total_emprestado DESC LIMIT 5`;
         const allLoansQuery = `SELECT * FROM loans ${whereClause} ${orderByClauseLoans}`;
         const listaAtrasadosQuery = `SELECT id, name, amount, balance_due, return_date, (CURRENT_DATE - return_date) as dias_atraso FROM loans WHERE status != 'Pago' AND return_date < CURRENT_DATE ORDER BY dias_atraso DESC, return_date ASC LIMIT 5`;
 
