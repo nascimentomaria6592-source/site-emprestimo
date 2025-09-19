@@ -30,19 +30,19 @@ router.get('/dashboard', async (req, res) => {
         const params = [];
         
         if (search && search.trim() !== '') { 
-            whereConditions.push(`name LIKE ${params.length + 1}`); 
+            whereConditions.push(`name LIKE $${params.length + 1}`); 
             params.push(`%${search.trim()}%`); 
         }
         if (mes && mes.trim() !== '') { 
-            whereConditions.push(`EXTRACT(MONTH FROM loan_date) = ${params.length + 1}`); 
+            whereConditions.push(`EXTRACT(MONTH FROM loan_date) = $${params.length + 1}`); 
             params.push(mes.padStart(2, '0')); 
         }
         if (ano && ano.trim() !== '') { 
-            whereConditions.push(`EXTRACT(YEAR FROM loan_date) = ${params.length + 1}`); 
+            whereConditions.push(`EXTRACT(YEAR FROM loan_date) = $${params.length + 1}`); 
             params.push(ano.trim()); 
         }
         if (return_date && return_date.trim() !== '') { 
-            whereConditions.push(`DATE(return_date) = DATE(${params.length + 1})`); 
+            whereConditions.push(`DATE(return_date) = $${params.length + 1}`); 
             params.push(return_date.trim()); 
         }
         
