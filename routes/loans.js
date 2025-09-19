@@ -267,7 +267,7 @@ router.post('/', upload.single('attachment'), async (req, res) => {
         INSERT INTO loans (
             name, cpf, phone, address_street, address_cep, address_bairro, address_city,
             amount, amount_with_interest, balance_due, loan_date, return_date, status, attachment_path
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Pendente', $12, $13)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendente', $13)
         RETURNING id
     `;
     
