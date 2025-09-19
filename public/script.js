@@ -97,6 +97,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDate = (dateString) => {
         return moment(dateString).format('DD/MM/YYYY');
     };
+
+    const showNotification = (message, type = 'error') => {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => { toast.classList.add('show'); }, 100);
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => { if (document.body.contains(toast)) { document.body.removeChild(toast); } }, 500);
+        }, 3000);
+    };
     
     // Modifique a função refreshAllData no script.js
     const refreshAllData = async () => {
@@ -149,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Falha ao recarregar todos os dados:', error);
             if(error.message.indexOf('Sessão expirada') === -1) {
-                alert('Não foi possível recarregar os dados: ' + error.message);
+                showNotification('Não foi possível recarregar os dados: ' + error.message, 'error');
             }
         }
     };
@@ -164,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { 
             console.error('Falha no Dashboard:', error); 
             if(error.message.indexOf('Sessão expirada') === -1) {
-                alert('Não foi possível carregar dados do Dashboard.'); 
+                showNotification('Não foi possível carregar dados do Dashboard.', 'error'); 
             }
         }
     };
@@ -179,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { 
             console.error('Falha nas Entradas:', error);
             if(error.message.indexOf('Sessão expirada') === -1) {
-                alert('Erro ao carregar dados de entradas: ' + error.message);
+                showNotification('Erro ao carregar dados de entradas: ' + error.message, 'error');
             }
         }
     };
@@ -195,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { 
             console.error('Falha nas Saídas:', error);
             if(error.message.indexOf('Sessão expirada') === -1) {
-                alert('Erro ao carregar dados de saídas: ' + error.message);
+                showNotification('Erro ao carregar dados de saídas: ' + error.message, 'error');
             }
         }
     };
@@ -266,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${p.id}</td><td>${p.name}</td><td>${formatCurrency(p.amount_paid)}</td><td>${formatDate(p.payment_date)}</td>
-                    <td>${p.description || 'N/A'}</td><td>${p.attachment_path ? `<a href="/${p.attachment_path.replace('public/', '')}" target="_blank">Ver Anexo</a>` : 'Não'}</td>
+                    <td>${p.description || 'N/A'}</td><td>${p.attachment_path ? `<a href="${p.attachment_path}" target="_blank">Ver Anexo</a>` : 'Não'}</td>
                     <td><button class="action-btn edit-btn" data-payment-id="${p.id}">Editar</button></td>`;
                 entradasTableBody.appendChild(row);
             });
@@ -357,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const abrirModalAtrasados = async () => {
         if (!atrasadosModal || !atrasadosLista) {
             console.error('Elementos do modal de atrasados não encontrados');
-            alert('Erro: Elementos do modal não encontrados');
+            showNotification('Erro: Elementos do modal não encontrados', 'error');
             return;
         }
         
@@ -522,7 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Erro ao carregar dados de relatórios:', error);
             hideLoadingIndicator();
-            alert('Não foi possível carregar os dados de relatórios: ' + error.message);
+            showNotification('Não foi possível carregar os dados de relatórios: ' + error.message, 'error');
         }
     };
     
@@ -986,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newPasswordInput = document.getElementById('new-password');
         if (!newPasswordInput) {
             console.error('Elemento "new-password" não encontrado');
-            alert('Erro no formulário. Por favor, recarregue a página.');
+            showNotification('Erro no formulário. Por favor, recarregue a página.', 'error');
             return;
         }
         
@@ -994,12 +1008,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Validação básica
         if (!newPassword) {
-            alert('Por favor, digite uma nova senha.');
+            showNotification('Por favor, digite uma nova senha.', 'error');
             return;
         }
         
         if (newPassword.length < 6) {
-            alert('A nova senha deve ter pelo menos 6 caracteres.');
+            showNotification('A nova senha deve ter pelo menos 6 caracteres.', 'error');
             return;
         }
         
@@ -1015,7 +1029,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } 
             
             const data = await response.json();
-            alert(data.message || 'Senha atualizada com sucesso!');
+            showNotification(data.message || 'Senha atualizada com sucesso!', 'success');
             
             // Atualizar o flag de troca de senha
             localStorage.setItem('mustChangePassword', 'false');
@@ -1029,7 +1043,7 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshAllData();
         } catch (error) { 
             console.error('Erro ao alterar senha:', error);
-            alert(`Erro: ${error.message}`); 
+            showNotification(`Erro: ${error.message}`, 'error'); 
         } 
     });
     
@@ -1061,7 +1075,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 const errorData = await response.json();
                 if (errorData.error) {
-                    alert('Erro: ' + errorData.error);
+                    showNotification('Erro: ' + errorData.error, 'error');
                 } else {
                     throw new Error('Falha ao criar empréstimo');
                 }
@@ -1071,8 +1085,9 @@ document.addEventListener('DOMContentLoaded', () => {
             loanModal.style.display = 'none';
             newLoanForm.reset();
             refreshAllData();
+            showNotification('Empréstimo criado com sucesso!', 'success');
         } catch (error) {
-            alert('Não foi possível salvar: ' + error.message);
+            showNotification('Não foi possível salvar: ' + error.message, 'error');
         }
     });
     
@@ -1081,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const loanId = document.getElementById('payment-loan-id').value;
         if (!loanId) { 
-            alert('Selecione um devedor válido da lista.'); 
+            showNotification('Selecione um devedor válido da lista.', 'error'); 
             return; 
         }
         const formData = new FormData(newPaymentForm);
@@ -1094,7 +1109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 const errorData = await response.json();
                 if (errorData.error) {
-                    alert('Erro: ' + errorData.error);
+                    showNotification('Erro: ' + errorData.error, 'error');
                 } else {
                     throw new Error('Falha ao registrar pagamento');
                 }
@@ -1103,8 +1118,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             paymentModal.style.display = 'none';
             refreshAllData();
+            showNotification('Pagamento registrado com sucesso!', 'success');
         } catch (error) {
-            alert('Não foi possível registrar o pagamento: ' + error.message);
+            showNotification('Não foi possível registrar o pagamento: ' + error.message, 'error');
         }
     });
     
@@ -1245,8 +1261,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 try { 
                     await fetchWithAuth(`/api/loans/${loanId}/mark-as-paid`, { method: 'PUT' }); 
                     refreshAllData(); 
+                    showNotification('Empréstimo quitado com sucesso!', 'success');
                 } catch (error) { 
-                    alert('Não foi possível quitar o empréstimo.'); 
+                    showNotification('Não foi possível quitar o empréstimo.', 'error'); 
                 } 
             } 
         }
@@ -1318,7 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 editPaymentModal.style.display = 'flex';
             } catch(error) { 
-                alert('Não foi possível carregar os dados do pagamento para edição.'); 
+                showNotification('Não foi possível carregar os dados do pagamento para edição.', 'error'); 
             }
         }
     });
@@ -1337,7 +1354,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 const errorData = await response.json();
                 if (errorData.error) {
-                    alert('Erro: ' + errorData.error);
+                    showNotification('Erro: ' + errorData.error, 'error');
                 } else {
                     throw new Error('Falha ao atualizar empréstimo');
                 }
@@ -1346,8 +1363,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             editLoanModal.style.display = 'none'; 
             refreshAllData(); 
+            showNotification('Empréstimo atualizado com sucesso!', 'success');
         } catch(error) { 
-            alert('Falha ao salvar as alterações: ' + error.message); 
+            showNotification('Falha ao salvar as alterações: ' + error.message, 'error'); 
         } 
     });
     
@@ -1365,7 +1383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 const errorData = await response.json();
                 if (errorData.error) {
-                    alert('Erro: ' + errorData.error);
+                    showNotification('Erro: ' + errorData.error, 'error');
                 } else {
                     throw new Error('Falha ao atualizar pagamento');
                 }
@@ -1374,8 +1392,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             editPaymentModal.style.display = 'none'; 
             refreshAllData(); 
+            showNotification('Pagamento atualizado com sucesso!', 'success');
         } catch(error) { 
-            alert('Falha ao salvar as alterações do pagamento: ' + error.message); 
+            showNotification('Falha ao salvar as alterações do pagamento: ' + error.message, 'error'); 
         } 
     });
     
