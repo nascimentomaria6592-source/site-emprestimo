@@ -4,121 +4,107 @@ const moment = require('moment');
 const upload = require('../multer-config');
 moment.locale('pt-br');
 
+const redisClient = require('../redis-client');
+
 router.get('/dashboard', async (req, res) => {
     const db = req.db;
     const { search, sortBy, order, mes, ano, return_date } = req.query;
-    const today = moment().format('YYYY-MM-DD');
-    const twoDaysFromNow = moment().add(2, 'days').format('YYYY-MM-DD');
-    
-    // Construir condições WHERE apenas para parâmetros não vazios
-    const whereConditions = [];
-    const params = [];
-    
-    // Adicionar condições apenas se os valores não forem vazios
-    if (search && search.trim() !== '') { 
-        whereConditions.push(`name LIKE $${params.length + 1}`); 
-        params.push(`%${search.trim()}%`); 
-    }
-    if (mes && mes.trim() !== '') { 
-        whereConditions.push(`EXTRACT(MONTH FROM loan_date) = $${params.length + 1}`); 
-        params.push(mes.padStart(2, '0')); 
-    }
-    if (ano && ano.trim() !== '') { 
-        whereConditions.push(`EXTRACT(YEAR FROM loan_date) = $${params.length + 1}`); 
-        params.push(ano.trim()); 
-    }
-    if (return_date && return_date.trim() !== '') { 
-        whereConditions.push(`DATE(return_date) = DATE($${params.length + 1})`); 
-        params.push(return_date.trim()); 
-    }
-    
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    
-    const validSortColumnsLoans = { name: 'name', date: 'return_date', loan_date: 'loan_date' };
-    const sortColumnLoans = validSortColumnsLoans[sortBy] || 'id';
-    const sortOrderLoans = order === 'asc' ? 'ASC' : 'DESC';
-    const orderByClauseLoans = `ORDER BY ${sortColumnLoans} ${sortOrderLoans}`;
-    
+    const cacheKey = `dashboard:${JSON.stringify(req.query)}`;
+
     try {
-        console.log('Parâmetros recebidos:', { search, sortBy, order, mes, ano, return_date });
-        console.log('Condições WHERE:', whereConditions);
-        console.log('Parâmetros:', params);
+        // Tenta obter os dados do cache primeiro
+        if (redisClient.isOpen) {
+            const cachedData = await redisClient.get(cacheKey);
+            if (cachedData) {
+                console.log('Servindo dados do cache para:', cacheKey);
+                return res.json(JSON.parse(cachedData));
+            }
+        }
+
+        // Se não estiver no cache, busca no banco de dados
+        console.log('Buscando dados do banco para:', cacheKey);
+        const today = moment().format('YYYY-MM-DD');
+        const twoDaysFromNow = moment().add(2, 'days').format('YYYY-MM-DD');
         
-        // Função para executar query com tratamento de erro
+        const whereConditions = [];
+        const params = [];
+        
+        if (search && search.trim() !== '') { 
+            whereConditions.push(`name LIKE ${params.length + 1}`); 
+            params.push(`%${search.trim()}%`); 
+        }
+        if (mes && mes.trim() !== '') { 
+            whereConditions.push(`EXTRACT(MONTH FROM loan_date) = ${params.length + 1}`); 
+            params.push(mes.padStart(2, '0')); 
+        }
+        if (ano && ano.trim() !== '') { 
+            whereConditions.push(`EXTRACT(YEAR FROM loan_date) = ${params.length + 1}`); 
+            params.push(ano.trim()); 
+        }
+        if (return_date && return_date.trim() !== '') { 
+            whereConditions.push(`DATE(return_date) = DATE(${params.length + 1})`); 
+            params.push(return_date.trim()); 
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        const validSortColumnsLoans = { name: 'name', date: 'return_date', loan_date: 'loan_date' };
+        const sortColumnLoans = validSortColumnsLoans[sortBy] || 'id';
+        const sortOrderLoans = order === 'asc' ? 'ASC' : 'DESC';
+        const orderByClauseLoans = `ORDER BY ${sortColumnLoans} ${sortOrderLoans}`;
+        
         const executeQuery = async (query, queryParams) => {
             try {
                 const result = await db.query(query, queryParams);
                 return result.rows;
             } catch (err) {
-                console.error('Erro na query:', query);
-                console.error('Parâmetros:', queryParams);
-                console.error('Erro:', err);
+                console.error('Erro na query:', query, 'Params:', queryParams, 'Erro:', err);
                 throw err;
             }
         };
         
-        // Query para total emprestado ativo
         const totalEmprestadoAtivoQuery = `SELECT COALESCE(SUM(amount), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
-        const totalEmprestadoAtivo = await executeQuery(totalEmprestadoAtivoQuery, params);
-        
-        // Query para total pago principal
         const totalPagoPrincipalQuery = `SELECT COALESCE(SUM(principal_paid), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status = 'Pago'`;
-        const totalPagoPrincipal = await executeQuery(totalPagoPrincipalQuery, params);
-        
-        // Query para saldo devedor ativo
         const saldoDevedorAtivoQuery = `SELECT COALESCE(SUM(balance_due), 0) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
-        const saldoDevedorAtivo = await executeQuery(saldoDevedorAtivoQuery, params);
-        
-        // Query para total juros recebidos
         const totalJurosRecebidosQuery = `SELECT COALESCE(SUM(interest_paid), 0) AS total FROM loans ${whereClause}`;
-        const totalJurosRecebidos = await executeQuery(totalJurosRecebidosQuery, params);
-        
-        // Query para empréstimos ativos
         const ativosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause ? whereClause + ' AND' : 'WHERE'} status != 'Pago'`;
-        const ativos = await executeQuery(ativosQuery, params);
         
-        // Query para empréstimos atrasados
         let atrasadosQuery, atrasadosParams;
         if (whereConditions.length > 0) {
-            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date < $${params.length + 1}`;
+            atrasadosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date < ${params.length + 1}`;
             atrasadosParams = [...params, today];
         } else {
             atrasadosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != 'Pago' AND return_date < $1`;
             atrasadosParams = [today];
         }
-        const atrasados = await executeQuery(atrasadosQuery, atrasadosParams);
         
-        // Query para próximos a vencer
         let proximosQuery, proximosParams;
         if (whereConditions.length > 0) {
-            proximosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date BETWEEN $${params.length + 1} AND $${params.length + 2}`;
+            proximosQuery = `SELECT COUNT(*) AS total FROM loans ${whereClause} AND status != 'Pago' AND return_date BETWEEN ${params.length + 1} AND ${params.length + 2}`;
             proximosParams = [...params, today, twoDaysFromNow];
         } else {
             proximosQuery = `SELECT COUNT(*) AS total FROM loans WHERE status != 'Pago' AND return_date BETWEEN $1 AND $2`;
             proximosParams = [today, twoDaysFromNow];
         }
-        const proximosAVencer = await executeQuery(proximosQuery, proximosParams);
         
-        // Query para top 5
         const top5Query = `SELECT name, SUM(amount) AS total_emprestado FROM loans ${whereClause} GROUP BY name ORDER BY total_emprestado DESC LIMIT 5`;
-        const top5 = await executeQuery(top5Query, params);
-        
-        // Query para todos os empréstimos
         const allLoansQuery = `SELECT * FROM loans ${whereClause} ${orderByClauseLoans}`;
-        const allLoans = await executeQuery(allLoansQuery, params);
-        
-        // Query para lista de atrasados
-        const listaAtrasadosQuery = `
-            SELECT id, name, amount, balance_due, return_date,
-            (CURRENT_DATE - return_date) as dias_atraso 
-            FROM loans 
-            WHERE status != 'Pago' AND return_date < CURRENT_DATE 
-            ORDER BY dias_atraso DESC, return_date ASC 
-            LIMIT 5
-        `;
-        const listaAtrasados = await executeQuery(listaAtrasadosQuery, []);
-        
-        res.json({
+        const listaAtrasadosQuery = `SELECT id, name, amount, balance_due, return_date, (CURRENT_DATE - return_date) as dias_atraso FROM loans WHERE status != 'Pago' AND return_date < CURRENT_DATE ORDER BY dias_atraso DESC, return_date ASC LIMIT 5`;
+
+        const [totalEmprestadoAtivo, totalPagoPrincipal, saldoDevedorAtivo, totalJurosRecebidos, ativos, atrasados, proximosAVencer, top5, allLoans, listaAtrasados] = await Promise.all([
+            executeQuery(totalEmprestadoAtivoQuery, params),
+            executeQuery(totalPagoPrincipalQuery, params),
+            executeQuery(saldoDevedorAtivoQuery, params),
+            executeQuery(totalJurosRecebidosQuery, params),
+            executeQuery(ativosQuery, params),
+            executeQuery(atrasadosQuery, atrasadosParams),
+            executeQuery(proximosQuery, proximosParams),
+            executeQuery(top5Query, params),
+            executeQuery(allLoansQuery, params),
+            executeQuery(listaAtrasadosQuery, [])
+        ]);
+
+        const responseData = {
             total_emprestado_ativo: totalEmprestadoAtivo[0]?.total || 0,
             total_pago_principal: totalPagoPrincipal[0]?.total || 0,
             saldo_devedor_ativo: saldoDevedorAtivo[0]?.total || 0,
@@ -129,7 +115,15 @@ router.get('/dashboard', async (req, res) => {
             top_5_emprestimos: top5,
             all_loans: allLoans,
             lista_atrasados: listaAtrasados
-        });
+        };
+
+        // Salva os dados no cache por 1 hora
+        if (redisClient.isOpen) {
+            await redisClient.set(cacheKey, JSON.stringify(responseData), { EX: 3600 });
+        }
+
+        res.json(responseData);
+
     } catch (err) {
         console.error("Erro na rota /dashboard:", err);
         res.status(500).json({ error: "Erro interno do servidor ao processar os dados." });
