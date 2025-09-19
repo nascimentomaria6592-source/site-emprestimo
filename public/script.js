@@ -1524,24 +1524,4 @@ document.querySelectorAll('.nav-button').forEach(button => {
 });
 
 // Chame também ao carregar a página
-document.addEventListener('DOMContentLoaded', controlarVisibilidadeTop5);VisibilidadeTop5);arVisibilidadeTop5);-content.active');
-    const isDashboard = activeTab && activeTab.id === 'dashboard-content';
-    
-    if (isDashboard) {
-        top5Element.style.display = 'block';
-        top5Element.closest('.content-box').style.display = 'block';
-    } else {
-        top5Element.style.display = 'none';
-        top5Element.closest('.content-box').style.display = 'none';
-    }
-}
-
-// Chame a função quando as abas mudarem
-document.querySelectorAll('.nav-button').forEach(button => {
-    button.addEventListener('click', () => {
-        setTimeout(controlarVisibilidadeTop5, 100); // Pequeno delay para garantir que a aba foi ativada
-    });
-});
-
-// Chame também ao carregar a página
 document.addEventListener('DOMContentLoaded', controlarVisibilidadeTop5);
