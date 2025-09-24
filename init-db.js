@@ -22,7 +22,6 @@ async function initializeDatabase() {
         console.log('✅ Conexão estabelecida com sucesso!');
         
         console.log('\n⚠️  APAGANDO tabelas existentes (payments, loans, users)...');
-        // Apagar tabelas na ordem correta para evitar erros de chave estrangeira
         await client.query('DROP TABLE IF EXISTS payments');
         await client.query('DROP TABLE IF EXISTS loans');
         await client.query('DROP TABLE IF EXISTS users');
@@ -30,42 +29,38 @@ async function initializeDatabase() {
 
         console.log('\nIniciando criação das tabelas...');
         
-        // Tabela de Empréstimos
-        await client.query(
-            'CREATE TABLE loans (
+        await client.query(`
+            CREATE TABLE loans (
                 id SERIAL PRIMARY KEY, name TEXT NOT NULL, cpf TEXT, phone TEXT,
                 address_street TEXT, address_cep TEXT, address_bairro TEXT, address_city TEXT,
                 amount DECIMAL(10,2) NOT NULL, amount_with_interest DECIMAL(10,2) NOT NULL,
                 balance_due DECIMAL(10,2) NOT NULL, interest_paid DECIMAL(10,2) NOT NULL DEFAULT 0,
                 principal_paid DECIMAL(10,2) NOT NULL DEFAULT 0, loan_date DATE NOT NULL,
-                return_date DATE NOT NULL, status TEXT NOT NULL DEFAULT \'Pendente\',
+                return_date DATE NOT NULL, status TEXT NOT NULL DEFAULT 'Pendente',
                 attachment_path TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )'
-        );
+            )
+        `);
         console.log('✓ Tabela loans criada com sucesso.');
 
-        // Tabela de Pagamentos
-        await client.query(
-            'CREATE TABLE payments (
+        await client.query(`
+            CREATE TABLE payments (
                 id SERIAL PRIMARY KEY, loan_id INTEGER NOT NULL REFERENCES loans(id) ON DELETE CASCADE,
                 amount_paid DECIMAL(10,2) NOT NULL, payment_date DATE NOT NULL,
                 description TEXT, attachment_path TEXT
-            )'
-        );
+            )
+        `);
         console.log('✓ Tabela payments criada com sucesso.');
 
-        // Tabela de Usuários
-        await client.query(
-            'CREATE TABLE users (
+        await client.query(`
+            CREATE TABLE users (
                 id SERIAL PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
                 must_change_password BOOLEAN DEFAULT true
-            )'
-        );
+            )
+        `);
         console.log('✓ Tabela users criada com sucesso.');
         
-        // Inserir usuários iniciais
         console.log('Inserindo usuários iniciais...');
         const users = ['Gustavo', 'Julio', 'Kassandra'];
         const defaultPassword = '123456';
@@ -79,10 +74,9 @@ async function initializeDatabase() {
         }
         console.log('✓ Usuários iniciais criados com sucesso.');
         
-        // Criar índices
-        await client.query('CREATE INDEX IF NOT EXISTS idx_loans_status ON loans(status)');
-        await client.query('CREATE INDEX IF NOT EXISTS idx_loans_return_date ON loans(return_date)');
-        await client.query('CREATE INDEX IF NOT EXISTS idx_payments_loan_id ON payments(loan_id)');
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_loans_status ON loans(status)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_loans_return_date ON loans(return_date)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_payments_loan_id ON payments(loan_id)`);
         console.log('✓ Índices criados com sucesso.');
         
         console.log('\n🎉 Banco de dados reinicializado com sucesso!');
