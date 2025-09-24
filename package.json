@@ -4,7 +4,7 @@
   "description": "Sistema de Controle de Empréstimos",
   "main": "app.js",
   "scripts": {
-    "start": "node init-db.js && node app.js",
+    "start": "echo \"--- PASSO 1: EXECUTANDO init-db.js ---\" && node init-db.js && echo \"--- PASSO 2: EXECUTANDO app.js ---\" && node app.js",
     "init-db": "node init-db.js",
     "apply-indexes": "node apply-indexes.js"
   },
