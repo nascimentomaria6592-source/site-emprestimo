@@ -268,11 +268,8 @@ router.post('/', upload.single('attachment'), async (req, res) => {
     const params = [name, cpf, phone, address_street, address_cep, address_bairro, address_city, 
                    principalAmount, amount_with_interest, principalAmount, loan_date, return_date, attachment_path];
     
-    req.db.query(sql, params, (err, result) => {
-        if (err) {
-            console.error("Erro ao inserir empréstimo no banco:", err);
-            return res.status(500).json({ error: err.message });
-        }
+    try {
+        const result = await req.db.query(sql, params);
         res.status(201).json({ id: result.rows[0].id });
         // Invalidate dashboard cache after a new loan is created
         if (redisClient.isOpen) {
@@ -282,7 +279,10 @@ router.post('/', upload.single('attachment'), async (req, res) => {
                 console.log(`Invalidated ${keys.length} dashboard cache keys.`);
             }
         }
-    });
+    } catch (err) {
+        console.error("Erro ao inserir empréstimo no banco:", err);
+        return res.status(500).json({ error: err.message });
+    }
 });
 
 router.put('/:id', upload.single('attachment'), async (req, res) => {
