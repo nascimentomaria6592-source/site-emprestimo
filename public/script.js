@@ -1085,6 +1085,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loanModal.style.display = 'none';
             newLoanForm.reset();
             refreshAllData();
+            loadSaidasData(); // Adicionado para atualizar a aba de Saídas
             showNotification('Empréstimo criado com sucesso!', 'success');
         } catch (error) {
             showNotification('Não foi possível salvar: ' + error.message, 'error');
