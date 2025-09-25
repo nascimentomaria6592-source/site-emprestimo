@@ -274,6 +274,14 @@ router.post('/', upload.single('attachment'), async (req, res) => {
             return res.status(500).json({ error: err.message });
         }
         res.status(201).json({ id: result.rows[0].id });
+        // Invalidate dashboard cache after a new loan is created
+        if (redisClient.isOpen) {
+            const keys = await redisClient.keys('dashboard:*');
+            if (keys.length > 0) {
+                await redisClient.del(keys);
+                console.log(`Invalidated ${keys.length} dashboard cache keys.`);
+            }
+        }
     });
 });
 
@@ -353,6 +361,14 @@ router.put('/:id', upload.single('attachment'), async (req, res) => {
         
         await req.db.query(sql, params);
         res.status(200).json({ message: "Empréstimo atualizado com sucesso." });
+        // Invalidate dashboard cache after a loan is updated
+        if (redisClient.isOpen) {
+            const keys = await redisClient.keys('dashboard:*');
+            if (keys.length > 0) {
+                await redisClient.del(keys);
+                console.log(`Invalidated ${keys.length} dashboard cache keys.`);
+            }
+        }
 
     } catch (err) {
         console.error("Erro ao atualizar empréstimo:", err);
